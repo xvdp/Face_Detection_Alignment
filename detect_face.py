@@ -55,7 +55,7 @@ class Network(object):
         session: The current TensorFlow session
         ignore_missing: If true, serialized weights for missing layers are ignored.
         '''
-        data_dict = np.load(data_path, encoding='latin1').item() #pylint: disable=no-member
+        data_dict = np.load(data_path, encoding='latin1', allow_pickle=True).item() #pylint: disable=no-member
         for op_name in data_dict:
             with tf.variable_scope(op_name, reuse=True):
                 for param_name, data in data_dict[op_name].items():
@@ -258,6 +258,7 @@ def create_detector(sess, model_path):
         data = tf.placeholder(tf.float32, (None,48,48,3), 'input')
         onet = ONet({'data':data})
         onet.load(os.path.join(model_path, 'cas3.npy'), sess)
+        print(os.path.join(model_path, 'cas3.npy'), os.path.isfile(os.path.join(model_path, 'cas3.npy')))
 
     pnet_fun = lambda img : sess.run(('pnet/conv4-2/BiasAdd:0', 'pnet/prob1:0'), feed_dict={'pnet/input:0':img})
     rnet_fun = lambda img : sess.run(('rnet/conv5-2/conv5-2:0', 'rnet/prob1:0'), feed_dict={'rnet/input:0':img})
@@ -393,7 +394,6 @@ def box_regression(img, onet, total_boxes, threshold):
     points=[]
     h=img.shape[0]
     w=img.shape[1]
-
     numbox = total_boxes.shape[0]
     if numbox>0:
         total_boxes = rerec(total_boxes)
@@ -521,21 +521,25 @@ def pad(total_boxes, w, h):
     ex = total_boxes[:,2].copy().astype(np.int32)
     ey = total_boxes[:,3].copy().astype(np.int32)
 
-    tmp = np.where(ex>w)
-    edx[tmp] = np.expand_dims(-ex[tmp]+w+tmpw[tmp],1)
-    ex[tmp] = w
+    tmp, = np.where(ex>w)
+    if tmp.shape[0] > 0:
+        edx[tmp] = -ex[tmp]+w+tmpw[tmp]
+        ex[tmp] = w
 
-    tmp = np.where(ey>h)
-    edy[tmp] = np.expand_dims(-ey[tmp]+h+tmph[tmp],1)
-    ey[tmp] = h
+    tmp, = np.where(ey>h)
+    if tmp.shape[0] > 0:
+        edy[tmp] = -ey[tmp]+h+tmph[tmp]
+        ey[tmp] = h
 
-    tmp = np.where(x<1)
-    dx[tmp] = np.expand_dims(2-x[tmp],1)
-    x[tmp] = 1
+    tmp, = np.where(x<1)
+    if tmp.shape[0] > 0:
+        dx[tmp] = 2-x[tmp]
+        x[tmp] = 1
 
-    tmp = np.where(y<1)
-    dy[tmp] = np.expand_dims(2-y[tmp],1)
-    y[tmp] = 1
+    tmp, = np.where(y<1)
+    if tmp.shape[0] > 0:
+        dy[tmp] = 2-y[tmp]
+        y[tmp] = 1
 
     return dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph
 

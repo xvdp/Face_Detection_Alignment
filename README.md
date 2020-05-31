@@ -1,4 +1,12 @@
 # Face_Detection_Alignment
+## modifications xvdp
+I had to make a few ajustments to have it run with cudatoolkit 10.1. conda environment with:
+
+`tensorflow=1.3.0, python==3.6.10, numpy==1.19.0rc1, matplotlib==3.2.1, opencv==4.2.0, scipy==1.2.3, menpo==0.8.1, menpofit==0.6.1, menpowidgets==0.3.0`
+np.load() and np.expand_dims() in detect_face.py
+
+
+## original
 Face Detection and Alignment Tool
 3D projection landmarks (84) and 2D multi-view landmarks(39/68)
 
