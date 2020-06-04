@@ -2,6 +2,19 @@ import tensorflow as tf
 import numpy as np
 
 slim = tf.contrib.slim
+from distutils.version import LooseVersion
+
+if LooseVersion(tf.__version__) >= LooseVersion("1.12"):
+    _tf1 = tf.compat.v1
+    _tfmaxpool = tf.nn.max_pool2d
+    _keepdims = lambda val: {"keepdims":val}
+    _tfdiv = tf.math.divide
+else:
+    _tf1 = tf
+    _tfmaxpool = tf.nn.max_pool
+    _keepdims = lambda val: {"keep_dims":val}
+    _tfdiv = tf.div
+
 
 # custom layers
 
@@ -51,7 +64,7 @@ def hourglass_arg_scope_torch(weight_decay=0.0001,
         'decay': batch_norm_decay,
         'epsilon': batch_norm_epsilon,
         'scale': batch_norm_scale,
-        'updates_collections': tf.GraphKeys.UPDATE_OPS,
+        'updates_collections': _tf1.GraphKeys.UPDATE_OPS,
     }
 
     with slim.arg_scope(
@@ -88,7 +101,7 @@ def hourglass_arg_scope_tf(weight_decay=0.0001,
         'decay': batch_norm_decay,
         'epsilon': batch_norm_epsilon,
         'scale': batch_norm_scale,
-        'updates_collections': tf.GraphKeys.UPDATE_OPS,
+        'updates_collections': _tf1.GraphKeys.UPDATE_OPS,
     }
 
     with slim.arg_scope(

@@ -7,6 +7,20 @@ import tensorflow as tf
 import cv2
 import os
 
+from distutils.version import LooseVersion
+
+if LooseVersion(tf.__version__) >= LooseVersion("1.12"):
+    _tf1 = tf.compat.v1
+    _tfmaxpool = tf.nn.max_pool2d
+    _keepdims = lambda val: {"keepdims":val}
+    _tfdiv = tf.math.divide
+else:
+    _tf1 = tf
+    _tfmaxpool = tf.nn.max_pool
+    _keepdims = lambda val: {"keep_dims":val}
+    _tfdiv = tf.div
+
+
 def layer(op):
     '''Decorator for composable network layers.'''
 
@@ -57,10 +71,10 @@ class Network(object):
         '''
         data_dict = np.load(data_path, encoding='latin1', allow_pickle=True).item() #pylint: disable=no-member
         for op_name in data_dict:
-            with tf.variable_scope(op_name, reuse=True):
+            with _tf1.variable_scope(op_name, reuse=True):
                 for param_name, data in data_dict[op_name].items():
                     try:
-                        var = tf.get_variable(param_name)
+                        var = _tf1.get_variable(param_name)
                         session.run(var.assign(data))
                     except ValueError:
                         if not ignore_missing:
@@ -94,7 +108,7 @@ class Network(object):
 
     def make_var(self, name, shape):
         '''Creates a new TensorFlow variable.'''
-        return tf.get_variable(name, shape, trainable=self.trainable)
+        return _tf1.get_variable(name, shape, trainable=self.trainable)
 
     def validate_padding(self, padding):
         '''Verifies that the padding is one of the supported ones.'''
@@ -122,7 +136,7 @@ class Network(object):
         assert c_o % group == 0
         # Convolution for a given input and kernel
         convolve = lambda i, k: tf.nn.conv2d(i, k, [1, s_h, s_w, 1], padding=padding)
-        with tf.variable_scope(name) as scope:
+        with _tf1.variable_scope(name) as scope:
             kernel = self.make_var('weights', shape=[k_h, k_w, c_i // group, c_o])
             # This is the common-case. Convolve the input without any further complications.
             output = convolve(inp, kernel)
@@ -137,7 +151,7 @@ class Network(object):
 
     @layer
     def prelu(self, inp, name):
-        with tf.variable_scope(name):
+        with _tf1.variable_scope(name):
             i = inp.get_shape().as_list()
             alpha = self.make_var('alpha', shape=(i[-1]))
             output = tf.nn.relu(inp) + tf.multiply(alpha, -tf.nn.relu(-inp))
@@ -146,15 +160,15 @@ class Network(object):
     @layer
     def max_pool(self, inp, k_h, k_w, s_h, s_w, name, padding='SAME'):
         self.validate_padding(padding)
-        return tf.nn.max_pool(inp,
-                              ksize=[1, k_h, k_w, 1],
-                              strides=[1, s_h, s_w, 1],
-                              padding=padding,
-                              name=name)
+        return _tfmaxpool(inp,
+                          ksize=[1, k_h, k_w, 1],
+                          strides=[1, s_h, s_w, 1],
+                          padding=padding,
+                          name=name)
 
     @layer
     def fc(self, inp, num_out, name, relu=True):
-        with tf.variable_scope(name):
+        with _tf1.variable_scope(name):
             input_shape = inp.get_shape()
             if input_shape.ndims == 4:
                 # The input is spatial. Vectorize it first.
@@ -166,7 +180,7 @@ class Network(object):
                 feed_in, dim = (inp, input_shape[-1].value)
             weights = self.make_var('weights', shape=[dim, num_out])
             biases = self.make_var('biases', [num_out])
-            op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
+            op = _tf1.nn.relu_layer if relu else _tf1.nn.xw_plus_b
             fc = op(feed_in, weights, biases, name=name)
             return fc
 
@@ -179,10 +193,10 @@ class Network(object):
     """
     @layer
     def softmax(self, target, axis, name=None):
-        max_axis = tf.reduce_max(target, axis, keep_dims=True)
+        max_axis = tf.reduce_max(target, axis, **_keepdims(True))
         target_exp = tf.exp(target-max_axis)
-        normalize = tf.reduce_sum(target_exp, axis, keep_dims=True)
-        softmax = tf.div(target_exp, normalize, name)
+        normalize = tf.reduce_sum(target_exp, axis, **_keepdims(True))
+        softmax = _tfdiv(target_exp, normalize, name)
         return softmax
 
 class PNet(Network):
@@ -246,16 +260,16 @@ class ONet(Network):
              .fc(10, relu=False, name='conv6-3'))
 
 def create_detector(sess, model_path):
-    with tf.variable_scope('pnet'):
-        data = tf.placeholder(tf.float32, (None,None,None,3), 'input')
+    with _tf1.variable_scope('pnet'):
+        data = _tf1.placeholder(tf.float32, (None,None,None,3), 'input')
         pnet = PNet({'data':data})
         pnet.load(os.path.join(model_path, 'cas1.npy'), sess)
-    with tf.variable_scope('rnet'):
-        data = tf.placeholder(tf.float32, (None,24,24,3), 'input')
+    with _tf1.variable_scope('rnet'):
+        data = _tf1.placeholder(tf.float32, (None,24,24,3), 'input')
         rnet = RNet({'data':data})
         rnet.load(os.path.join(model_path, 'cas2.npy'), sess)
-    with tf.variable_scope('onet'):
-        data = tf.placeholder(tf.float32, (None,48,48,3), 'input')
+    with _tf1.variable_scope('onet'):
+        data = _tf1.placeholder(tf.float32, (None,48,48,3), 'input')
         onet = ONet({'data':data})
         onet.load(os.path.join(model_path, 'cas3.npy'), sess)
         print(os.path.join(model_path, 'cas3.npy'), os.path.isfile(os.path.join(model_path, 'cas3.npy')))
@@ -298,7 +312,6 @@ def detect_face(img, minsize, pnet, rnet, onet, threshold, factor):
         out = pnet(img_y)
         out0 = np.transpose(out[0], (0,2,1,3))
         out1 = np.transpose(out[1], (0,2,1,3))
-
         boxes, _ = generateBoundingBox(out1[0,:,:,1].copy(), out0[0,:,:,:].copy(), scale, threshold[0])
 
         # inter-scale nms

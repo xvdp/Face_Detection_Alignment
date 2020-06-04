@@ -2,11 +2,24 @@ import tensorflow as tf
 import numpy as np
 import scipy
 import data_provider
-import utils
+import utils2
 import pickle
 import models
 
 from tensorflow.python.platform import tf_logging as logging
+
+from distutils.version import LooseVersion
+
+if LooseVersion(tf.__version__) >= LooseVersion("1.12"):
+    _tf1 = tf.compat.v1
+    _tfmaxpool = tf.nn.max_pool2d
+    _keepdims = lambda val: {"keepdims":val}
+    _tfdiv = tf.math.divide
+else:
+    _tf1 = tf
+    _tfmaxpool = tf.nn.max_pool
+    _keepdims = lambda val: {"keep_dims":val}
+    _tfdiv = tf.div
 
 slim = tf.contrib.slim
 
@@ -41,7 +54,7 @@ class DeepNetwork(object):
         if FLAGS.pretrained_model_checkpoint_path:
             print('Loading whole model ...')
             variables_to_restore = slim.get_model_variables()
-            init_fn =  slim.assign_from_checkpoint_fn(
+            init_fn = slim.assign_from_checkpoint_fn(
                 FLAGS.pretrained_model_checkpoint_path,
                 variables_to_restore,
                 ignore_missing_vars=True)
@@ -59,7 +72,7 @@ class DeepNetwork(object):
             images /= 255.
 
             # Define model graph.
-            with tf.variable_scope('net'):
+            with _tf1.variable_scope('net'):
                 with slim.arg_scope([slim.batch_norm, slim.layers.dropout],
                 is_training=True):
 
@@ -149,7 +162,7 @@ class DNFaceMultiView(DeepNetwork):
                 net = None
                 # stacked hourglass
                 for i in range(n_stacks):
-                    with tf.variable_scope('stack_%02d' % i):
+                    with _tf1.variable_scope('stack_%02d' % i):
                         if net is not None:
                             net = tf.concat((inputs, net), 3)
                         else:
@@ -170,7 +183,7 @@ class DNFaceMultiView(DeepNetwork):
     def _build_losses(self, predictions, states, images, datas):
         gt_heatmap, gt_lms, mask_index, gt_mask = datas
 
-        weight_hm = utils.get_weight(gt_heatmap, tf.ones_like(gt_heatmap), ng_w=0.1, ps_w=1) * 500
+        weight_hm = utils2.get_weight(gt_heatmap, tf.ones_like(gt_heatmap), ng_w=0.1, ps_w=1) * 500
         weight_hm *= gt_mask[:,None,None,:]
 
         l2norm = slim.losses.mean_squared_error(states[0], gt_heatmap, weights=weight_hm)

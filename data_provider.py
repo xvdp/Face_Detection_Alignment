@@ -1,32 +1,32 @@
 import tensorflow as tf
 import numpy as np
-import menpo.io as mio
-import menpo
+# import menpo.io as mio
+# import menpo
 import scipy
-import utils
+# import utils
 
-from pathlib import Path
-from scipy.io import loadmat
-from menpo.image import Image
-from menpo.shape import PointCloud
-from menpo.transform import Translation
+# from pathlib import Path
+# from scipy.io import loadmat
+# from menpo.image import Image
+# from menpo.shape import PointCloud
+# from menpo.transform import Translation
 
 from flags import FLAGS
 
-def augment_img(img, augmentation):
-    flip, rotate, rescale = np.array(augmentation).squeeze()
-    rimg = img.rescale(rescale)
-    rimg = rimg.rotate_ccw_about_centre(rotate)
-    crimg = rimg.warp_to_shape(
-        img.shape,
-        Translation(-np.array(img.shape) / 2 + np.array(rimg.shape) / 2)
-    )
-    if flip > 0.5:
-        crimg = crimg.mirror()
+# def augment_img(img, augmentation):
+#     flip, rotate, rescale = np.array(augmentation).squeeze()
+#     rimg = img.rescale(rescale)
+#     rimg = rimg.rotate_ccw_about_centre(rotate)
+#     crimg = rimg.warp_to_shape(
+#         img.shape,
+#         Translation(-np.array(img.shape) / 2 + np.array(rimg.shape) / 2)
+#     )
+#     if flip > 0.5:
+#         crimg = crimg.mirror()
 
-    img = crimg
+#     img = crimg
 
-    return img
+#     return img
 
 def rotate_points_tensor(points, image, angle):
 
