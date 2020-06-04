@@ -5,6 +5,8 @@ I had to make a few ajustments to have it run with cudatoolkit 10.1. conda envir
 `tensorflow=1.3.0, python==3.6.10, numpy==1.19.0rc1, matplotlib==3.2.1, opencv==4.2.0, scipy==1.2.3, menpo==0.8.1, menpofit==0.6.1, menpowidgets==0.3.0`
 np.load() and np.expand_dims() in detect_face.py
 
+Partial removal of menpo. Menpo was a nice idea but has weaknesses in that relies on deprecated methods
+Partial migration to tensorflow >= 1.13: Face Detector works in tf2.2; landmarks require removal of tf.slim for that. 
 
 ## original
 Face Detection and Alignment Tool
